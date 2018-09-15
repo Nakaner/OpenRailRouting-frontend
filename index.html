@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Railway routing on OpenStreetMap data</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="leaflet.css" />
+    <link rel="stylesheet" href="css/leaflet.contextmenu.css" />
+    <script src="leaflet.js"></script>
+    <script src="js/leaflet.contextmenu.js"></script>
+    <style>
+        body {
+            position: fixed;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <img src="images/hamburger.svg" width="21" height="21" id="open-menu-icon" >
+        <div id="title">
+            <a href="#">Railway routing on OpenStreetMap data (beta)</a>
+        </div>
+        <nav id="menu">
+            <ul>
+                <li>
+                    <a href="about.html">About</a>
+                </li>
+                <li>
+                    <a href="imprint.html">Imprint</a>
+                </li>
+            </ul>
+        </nav>
+    </header>
+    <div id="routingcontrols">
+        <form id="routing">
+            <label>vehicle</label>
+            <select name="vehicle" id="vehicle" size="4"></select>
+            <label>from <span class="inputDescription">(lat, lon)</span></label>
+            <div class="fieldWithIcon">
+                <img src="images/marker-green.svg" class="formIcon">
+                <input type="text" id="inputFrom" autocomplete="off">
+            </div>
+            <label>via <span class="inputDescription">(lat, lon)</span></label>
+            <div id="vias">
+                <div class="fieldWithIcon viaBlock" id="viaBlock1">
+                    <img src="images/marker-blue.svg" class="formIcon">
+                    <input type="text" id="via_1" autocomplete="off">
+                </div>
+            </div>
+            <label>to <span class="inputDescription">(lat, lon)</span></label>
+            <div>
+                <img src="images/marker-red.svg" class="formIcon">
+                <input type="text" id="inputTo" autocomplete="off">
+            </div>
+            <input type="button" id="submit" value="Get route">
+        </form>
+	<div class="errorMessage" id="routingErrorMessage"></div>
+        <img id="loading" src="images/loading.svg" width="48" height="48">
+    </div>
+    <div id="mapid">
+    </div>
+    <script type="text/javascript" src="hamburger.js"></script>
+    <script type="text/javascript" src="mapdisplay.js"></script>
+</body>
+</html>
