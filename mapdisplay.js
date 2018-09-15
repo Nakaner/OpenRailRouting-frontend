@@ -476,9 +476,9 @@ function setViaFromMap(e) {
     tryGetRoute();
 }
 
-function formEnterKeyPressed(event) {
+function formEnterKeyPressed(event, callable) {
     if (event.keyCode == 13) {
-        getAndDisplayRoute();
+        callable();
     }
 }
 
@@ -535,6 +535,7 @@ mymap.on('overlayadd', function(e) {
 });
 
 document.getElementById('submit').addEventListener('click', function(event){getAndDisplayRoute();});
-document.getElementById('inputFrom').addEventListener('keypress', function(event){formEnterKeyPressed(event);});
-document.getElementById('inputTo').addEventListener('keypress', function(event){formEnterKeyPressed(event);});
-
+document.getElementById('inputFrom').addEventListener('keypress', function(event){formEnterKeyPressed(event, getAndDisplayRoute);});
+document.getElementById('inputTo').addEventListener('keypress', function(event){formEnterKeyPressed(event, getAndDisplayRoute);});
+document.getElementById('vehicle').addEventListener('change', tryGetRoute);
+document.getElementById('vehicle').addEventListener('keypress', function(event){formEnterKeyPressed(event, getAndDisplayRoute);});
