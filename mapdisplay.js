@@ -121,21 +121,25 @@ function updateUrl(newBaseLayerName, overlayIDs) {
     history.replaceState('', document.title, newurl);
 }
 
+function getViaFieldId(index) {
+    return "via_" + index;
+}
+
 function updateInputFields() {
-    var viaDiv = document.getElementById('vias');
-    var viaBlocks = viaDiv.querySelectorAll('.viaBlock');
+    var viaUl = document.getElementById('vias');
+    var viaBlocks = viaUl.querySelectorAll('.viaBlock');
     // remove existing viaBlocks except of the first one
     var i;
     for (i = 1; i < viaBlocks.length; i++) {
-        viaDiv.removeChild(viaBlocks[i]);
+        viaUl.removeChild(viaBlocks[i]);
     }
     // create enought empty viaBlocks
     var k;
-    var viaBlock1 = viaDiv.querySelector('#viaBlock1');
+    var viaBlock1 = viaUl.querySelector('li.viaBlock');
     for (k = 2; k < markers.length - 1; k++) {
         var newBlock = viaBlock1.cloneNode(true);
         newBlock.id = 'viaBlock' + k;
-        newBlock.querySelector('input').id = 'via_' + k;
+        newBlock.querySelector('input').id = getViaFieldId(k);
         newBlock.querySelector('input').value = '';
         newBlock.querySelector('input').setAttribute('point-index', k);
         viaBlock1.parentNode.insertBefore(newBlock, null); // null inserts at end of list
@@ -159,24 +163,40 @@ function updateInputFields() {
     registerDragDropEventsForAll();
 }
 
+/**
+ * update point-index properties of input fields for via points
+ */
+function updateViaIndexes() {
+    var vias = Array.prototype.slice.call(document.getElementsByClassName('viaInputField'));
+    for (var i = 0; i < vias.length; ++i) {
+        vias[i].setAttribute('point-index', i + 1);
+    }
+}
+
 function updateMarkersList() {
-    //TODO implement
     var start = parseCoordsFromStr(document.getElementById('inputFrom').value);
     var end = parseCoordsFromStr(document.getElementById('inputTo').value);
-    var vias = Array.prototype.slice.call(document.getElementByClassName('viaInputFields'));
+    var vias = Array.prototype.slice.call(document.getElementsByClassName('viaInputField'));
     // Vias is sorted by the order of the input fields in the DOM.
     // remove old markers from map
     markers.forEach(function(m) {
         m.removeFrom(mymap);
     });
+    markers = [];
+    // add start marker
+    addMarker(start, 0, "start", true, function(){});
     // update point indexes and add new markers
     for (var i = 0; i < vias.length; ++i) {
-        vias[i].setAttribute('point-index', i);
+        vias[i].setAttribute('point-index', i + 1);
+        vias[i].id = getViaFieldId(i + 1);
         var latlng = parseCoordsFromStr(vias[i].value);
-        var marker = L.marker(latlng, {draggable: true}).bindPopup(getMarkerPopupContent(index));
-        markers[i] = marker;
-        marker.addTo(mymap);
+        addMarker(latlng, i + 1, "via", true, function(){});
+        //var marker = L.marker(latlng, {draggable: true}).bindPopup(getMarkerPopupContent(i));
+        //markers[i] = marker;
+        //marker.addTo(mymap);
     }
+    // add end marker
+    addMarker(end, vias.length + 1, "end", true, function(){});
 }
 
 function getRemoveButtonId(index) {
@@ -187,7 +207,7 @@ function getMarkerPopupContent(index) {
     return '<b>via ' + index + '</b><br><button type="button" onclick="removeMarker(' + index + ')">Remove</button>';
 }
 
-function addMarker(latlng, index, message, insert /*= false*/) {
+function addMarker(latlng, index, message, insert /*= false*/, callbackAfter) {
     if (markers.length >= 9) {
         // too much vias
         return;
@@ -200,7 +220,7 @@ function addMarker(latlng, index, message, insert /*= false*/) {
         }
 	marker.setIcon(new RouteMarker({iconUrl: 'images/marker-green.svg'}));
         markers[0] = marker;
-    } else if (index === markers.length - 1 && !insert) {
+    } else if (message === 'end' || (index === markers.length - 1 && !insert)) {
         if (markers[index] != null) {
             markers[index].remove();
         }
@@ -221,7 +241,8 @@ function addMarker(latlng, index, message, insert /*= false*/) {
         markers[i].setPopupContent(getMarkerPopupContent(i));
     }
     // update text input field entries in the form
-    updateInputFields();
+    callbackAfter();
+    // updateInputFields();
     marker.on('dragend', function(e){
         updateInputFields();
         tryGetRoute();
@@ -480,13 +501,13 @@ function tryGetRoute() {
 
 function setStartFromMap(e) {
     document.getElementById('inputFrom').value = e.latlng.lat + "," + e.latlng.lng;
-    addMarker(e.latlng, 0, 'start');
+    addMarker(e.latlng, 0, 'start', false, updateInputFields);
     tryGetRoute();
 }
 
 function setEndFromMap(e) {
     document.getElementById('inputTo').value = e.latlng.lat + "," + e.latlng.lng;
-    addMarker(e.latlng, markers.length - 1, 'end');
+    addMarker(e.latlng, markers.length - 1, 'end', false, updateInputFields);
     tryGetRoute();
 }
 
@@ -495,10 +516,10 @@ function setViaFromMap(e) {
     var currentVias = markers.length - 2;
     if (currentVias == 0) {
         // set first via
-        addMarker(e.latlng, 1, 'via 1', true);
+        addMarker(e.latlng, 1, 'via', true, updateInputFields);
     } else {
         var index = getNextPoints(e.latlng);
-        addMarker(e.latlng, index, 'via', true);
+        addMarker(e.latlng, index, 'via', true, updateInputFields);
     }
     tryGetRoute();
 }
@@ -564,7 +585,6 @@ mymap.on('overlayadd', function(e) {
 function registerDragAndDropEvents(elem) {
     elem.addEventListener('dragstart', function(ev){
             dragSrc = this;
-            console.log('dragstart: ' + this.outerHTML);
             ev.dataTransfer.setData('text/html', this.outerHTML);
             ev.dataTransfer.effectAllowed = 'move';
             this.classList.add('dragging');
@@ -591,7 +611,6 @@ function registerDragAndDropEvents(elem) {
         false
     );
     elem.addEventListener('dragend', function(ev) {
-            console.log('dragend: ' + this.outerHTML);
             this.classList.remove('dragging');
         },
         false
@@ -599,12 +618,12 @@ function registerDragAndDropEvents(elem) {
     elem.addEventListener('drop', function(ev) {
             ev.stopPropagation();
             ev.preventDefault();
-            console.log('drop: this: ' + this.outerHTML);
             // Check for dragSrc != null is required to ignore the 2th to nth time the event is fired at the end of a single drag.
             if (dragSrc != this && dragSrc != null) {
-                console.log('drop accepted');
                 this.parentNode.insertBefore(dragSrc, this);
                 dragSrc = null;
+                updateViaIndexes();
+                updateMarkersList();
                 getAndDisplayRoute();
             }
             this.classList.remove('draggedOver');
