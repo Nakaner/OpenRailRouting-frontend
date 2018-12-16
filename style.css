@@ -203,3 +203,19 @@ div#routingErrorMessage {
 .context-menu-active {
     display: block;
 }
+
+ul li.viaBlock {
+    list-style-type: none;
+}
+
+ul#vias {
+    padding-left: 0;
+}
+
+.dragging {
+    opacity: 0.4;
+}
+
+.draggedOver {
+    border-top: 2px solid blue;
+}

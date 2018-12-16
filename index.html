@@ -42,12 +42,12 @@
                 <input type="text" id="inputFrom" autocomplete="off">
             </div>
             <label>via <span class="inputDescription">(lat, lon)</span></label>
-            <div id="vias">
-                <div class="fieldWithIcon viaBlock" id="viaBlock1">
-                    <img src="images/marker-blue.svg" class="formIcon">
-                    <input type="text" id="via_1" autocomplete="off">
-                </div>
-            </div>
+            <ul id="vias">
+                <li class="fieldWithIcon viaBlock" id="viaBlock1" draggable="true">
+                    <img src="images/marker-blue.svg" class="formIcon draggableVia" draggable="false">
+                    <input type="text" id="via_1" class="viaInputField" data-point-index="1" autocomplete="off">
+                </li>
+            </ul>
             <label>to <span class="inputDescription">(lat, lon)</span></label>
             <div>
                 <img src="images/marker-red.svg" class="formIcon">
