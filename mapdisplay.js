@@ -31,15 +31,16 @@ var activeLayers = [];
 var defaultOverlays = [];
 var initialLayers = [osmOrgTilesLayer, route];
 
+var routeMarkerOptions = {
+    shadowUrl: 'images/marker-shadow.png',
+    iconSize: [27, 44],
+    iconAnchor: [13.5, 44],
+    popupAnchor: [1, -34],
+    tooltipAnchor: [16, -28],
+    shadowSize: [41, 41]
+};
 var RouteMarker = L.Icon.extend({
-    options: {
-        shadowUrl: 'images/marker-shadow.png',
-	iconSize: [25, 41],
-	iconAnchor: [12.5, 41],
-        popupAnchor: [1, -34],
-        tooltipAnchor: [16, -28],
-        shadowSize: [41, 41]
-    }
+    options: routeMarkerOptions
 });
 
 var mymap; // the Leaflet map instance
@@ -511,17 +512,21 @@ function setEndFromMap(e) {
     tryGetRoute();
 }
 
+function addVia(coords, index) {
+    addMarker(coords, index, 'via', true, updateInputFields);
+    tryGetRoute();
+}
+
 function setViaFromMap(e) {
     // existing number of vias
     var currentVias = markers.length - 2;
     if (currentVias == 0) {
         // set first via
-        addMarker(e.latlng, 1, 'via', true, updateInputFields);
+        addVia(e.latlng, 1);
     } else {
         var index = getNextPoints(e.latlng);
-        addMarker(e.latlng, index, 'via', true, updateInputFields);
+        addVia(e.latlng, index);
     }
-    tryGetRoute();
 }
 
 function formEnterKeyPressed(event, callable) {
@@ -631,6 +636,36 @@ function registerDragAndDropEvents(elem) {
         false
     );
 }
+
+
+document.getElementById('mapid').addEventListener('dragover',
+    function (ev) {
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = 'move';
+    },
+    false
+);
+
+document.getElementById('mapid').addEventListener('drop',
+    function(ev) {
+        console.log('drop mymap');
+        ev.preventDefault;
+        // if dragSrc != null, we are in dragging mode
+        if (dragSrc != null) {
+            var dropCoords = [ev.clientX - dragSrc.offsetWidth, ev.clientY - dragSrc.offsetHeight];
+            dropCoords = [dropCoords[0] - routeMarkerOptions.iconSize[0], dropCoords[1] + routeMarkerOptions.iconSize[1] / 2];
+            var coords = mymap.containerPointToLatLng(L.point(dropCoords));
+            if (markers.length - 2 === 0) {
+                addVia(coords, 1);
+            } else {
+                var index = getNextPoints(coords);
+                addVia(coords, index);
+            }
+            dragSrc = null;
+        }
+    },
+    false
+);
 
 function registerDragDropEventsForAll() {
     Array.from(document.getElementsByClassName('viaBlock')).forEach(function(elem) {
