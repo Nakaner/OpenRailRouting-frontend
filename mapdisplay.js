@@ -43,6 +43,12 @@ var RouteMarker = L.Icon.extend({
     options: routeMarkerOptions
 });
 
+var markerIconsPaths = {
+    'start': 'images/marker-green.svg',
+    'via': 'images/marker-blue.svg',
+    'end': 'images/marker-red.svg'
+};
+
 var mymap; // the Leaflet map instance
 var layerControl;
 var attributionControl;
@@ -123,27 +129,34 @@ function updateUrl(newBaseLayerName, overlayIDs) {
 }
 
 function getViaFieldId(index) {
-    return "via_" + index;
+    return "point_" + index;
 }
 
 function updateInputFields() {
     var viaUl = document.getElementById('vias');
-    var viaBlocks = viaUl.querySelectorAll('.viaBlock');
+    var viaBlocks = viaUl.querySelectorAll('.pointBlock');
     // remove existing viaBlocks except of the first one
     var i;
-    for (i = 1; i < viaBlocks.length; i++) {
+    for (i = 1; i < viaBlocks.length - 1; i++) {
+        // remove all input fields except first and last one
         viaUl.removeChild(viaBlocks[i]);
     }
+    // rename last viaBlock
+    viaBlocks[viaBlocks.length - 1].id = 'pointBlock' + (markers.length - 1);
+    viaBlocks[viaBlocks.length - 1].querySelector('input').id = getViaFieldId(markers.length - 1);
     // create enought empty viaBlocks
     var k;
-    var viaBlock1 = viaUl.querySelector('li.viaBlock');
-    for (k = 2; k < markers.length - 1; k++) {
-        var newBlock = viaBlock1.cloneNode(true);
-        newBlock.id = 'viaBlock' + k;
+    var pointBlock1 = viaUl.querySelector('li.pointBlock');
+    for (k = 1; k < markers.length - 1; k++) {
+        var newBlock = pointBlock1.cloneNode(true);
+        newBlock.id = 'pointBlock' + k;
         newBlock.querySelector('input').id = getViaFieldId(k);
         newBlock.querySelector('input').value = '';
         newBlock.querySelector('input').setAttribute('point-index', k);
-        viaBlock1.parentNode.insertBefore(newBlock, null); // null inserts at end of list
+        if (k > 0) {
+            newBlock.querySelector('img').src = markerIconsPaths.via;
+        }
+        pointBlock1.parentNode.insertBefore(newBlock, viaBlocks[viaBlocks.length - 1]); // insert before last point
     }
     // add/update fields
     var i;
@@ -152,14 +165,8 @@ function updateInputFields() {
             continue;
         }
         var value = markers[i].getLatLng().lat.toFixed(5) + "," + markers[i].getLatLng().lng.toFixed(5);
-        if (i === 0) {
-            document.getElementById('inputFrom').value = value;
-        } else if (i === markers.length - 1) {
-            document.getElementById('inputTo').value = value;
-        } else {
-            var viaId = 'via_' + i;
-            document.getElementById(viaId).value = value;
-        }
+        var viaId = getViaFieldId(i);
+        document.getElementById(viaId).value = value;
     }
     registerDragDropEventsForAll();
 }
@@ -168,16 +175,14 @@ function updateInputFields() {
  * update point-index properties of input fields for via points
  */
 function updateViaIndexes() {
-    var vias = Array.prototype.slice.call(document.getElementsByClassName('viaInputField'));
+    var vias = Array.prototype.slice.call(document.getElementsByClassName('pointInputField'));
     for (var i = 0; i < vias.length; ++i) {
         vias[i].setAttribute('point-index', i + 1);
     }
 }
 
 function updateMarkersList() {
-    var start = parseCoordsFromStr(document.getElementById('inputFrom').value);
-    var end = parseCoordsFromStr(document.getElementById('inputTo').value);
-    var vias = Array.prototype.slice.call(document.getElementsByClassName('viaInputField'));
+    var points = Array.prototype.slice.call(document.getElementsByClassName('pointInputField'));
     // Vias is sorted by the order of the input fields in the DOM.
     // remove old markers from map
     markers.forEach(function(m) {
@@ -185,26 +190,37 @@ function updateMarkersList() {
     });
     markers = [];
     // add start marker
-    addMarker(start, 0, "start", true, function(){});
     // update point indexes and add new markers
-    for (var i = 0; i < vias.length; ++i) {
-        vias[i].setAttribute('point-index', i + 1);
-        vias[i].id = getViaFieldId(i + 1);
-        var latlng = parseCoordsFromStr(vias[i].value);
-        addMarker(latlng, i + 1, "via", true, function(){});
+    for (var i = 0; i < points.length; ++i) {
+        points[i].setAttribute('point-index', i);
+        points[i].id = getViaFieldId(i);
+        var latlng = parseCoordsFromStr(points[i].value);
+        var markerType = 'via';
+        if (i === 0) {
+            markerType = 'start';
+        } else if (i === points.length - 1) {
+            markerType = 'end';
+        }
+        points[i].parentNode.getElementsByTagName('img')[0].src = markerIconsPaths[markerType];
+        console.log('going to addMarker with index ' + (i) + ' and markers: ' + markers);
+        addMarker(latlng, i + 1, markerType, true, function(){});
         //var marker = L.marker(latlng, {draggable: true}).bindPopup(getMarkerPopupContent(i));
         //markers[i] = marker;
         //marker.addTo(mymap);
     }
-    // add end marker
-    addMarker(end, vias.length + 1, "end", true, function(){});
 }
 
 function getRemoveButtonId(index) {
     return 'remove-button-' + index;
 }
 
-function getMarkerPopupContent(index) {
+function getMarkerPopupContent(index, message) {
+    if (message === 'start') {
+        return '<b>start</b>';
+    }
+    if (message === 'end') {
+        return '<b>end</b>';
+    }
     return '<b>via ' + index + '</b><br><button type="button" onclick="removeMarker(' + index + ')">Remove</button>';
 }
 
@@ -214,21 +230,21 @@ function addMarker(latlng, index, message, insert /*= false*/, callbackAfter) {
         return;
     }
     insert = insert || false;
-    var marker = L.marker(latlng, {draggable: true}).bindPopup(getMarkerPopupContent(index));
-    if (index === 0) {
+    var marker = L.marker(latlng, {draggable: true}).bindPopup(getMarkerPopupContent(index, message));
+    if ((message === 'start' || index === 0) && message != 'end') {
         if (markers[0] != null) {
             markers[0].remove();
         }
-	marker.setIcon(new RouteMarker({iconUrl: 'images/marker-green.svg'}));
+        marker.setIcon(new RouteMarker({iconUrl: markerIconsPaths.start}));
         markers[0] = marker;
     } else if (message === 'end' || (index === markers.length - 1 && !insert)) {
-        if (markers[index] != null) {
+        if (index < markers.length && markers[index] != null) {
             markers[index].remove();
         }
-	marker.setIcon(new RouteMarker({iconUrl: 'images/marker-red.svg'}));
-        markers[index] = marker;
+        marker.setIcon(new RouteMarker({iconUrl: markerIconsPaths.end}));
+        markers.splice(index, 1, marker);
     } else {
-	marker.setIcon(new RouteMarker({iconUrl: 'images/marker-blue.svg'}));
+        marker.setIcon(new RouteMarker({iconUrl: markerIconsPaths.via}));
         if (insert) {
             // interprete as insertion of a new via point before the last point
             markers.splice(index, 0, marker);
@@ -239,7 +255,7 @@ function addMarker(latlng, index, message, insert /*= false*/, callbackAfter) {
     }
     // update texts of all via markers
     for (var i = 1; i < markers.length - 1; i++) {
-        markers[i].setPopupContent(getMarkerPopupContent(i));
+        markers[i].setPopupContent(getMarkerPopupContent(i, null));
     }
     // update text input field entries in the form
     callbackAfter();
@@ -258,7 +274,7 @@ function removeMarker(index) {
     markers.splice(index, 1);
     // update all markers
     for (var i = 1; i < markers.length - 1; i++) {
-        markers[i].setPopupContent(getMarkerPopupContent(i));
+        markers[i].setPopupContent(getMarkerPopupContent(i, null));
     }
     updateInputFields();
     tryGetRoute();
@@ -396,7 +412,7 @@ function loadInfos() {
                 optionElement.text = elem;
                 vehicleSelect.add(optionElement);
             });
-	    vehicleSelect.value = supported_vehicles[0];
+            vehicleSelect.value = supported_vehicles[0];
         }
     }
     xhr.onerror = function() {
@@ -409,10 +425,10 @@ function showLoading(turnOn) {
     var loading = document.getElementById('loading');
     if (turnOn) {
         loading.style.display = 'block';
-    	document.getElementById('submit').disabled = true;
+        document.getElementById('submit').disabled = true;
     } else {
         loading.style.display = 'none';
-    	document.getElementById('submit').disabled = false;
+        document.getElementById('submit').disabled = false;
     }
 }
 
@@ -479,9 +495,10 @@ function parseCoordsFromStr(str) {
 function getAndDisplayRoute(e) {
     var points = getStartAndEnd();
     if (!requestPointsValid(points)) {
+        //TODO Is this still necessary?
         // fill with coordinates from text input fields
-        var start = parseCoordsFromStr(document.getElementById('inputFrom').value);
-        var end = parseCoordsFromStr(document.getElementById('inputTo').value);
+        var start = parseCoordsFromStr(document.getElementById(getViaFieldId(0)).value);
+        var end = parseCoordsFromStr(document.getElementById(getViaFieldId(markers.length - 1)).value);
         points = [start, end];
     }
     if (points[0] != null && points[points.length - 1] != null) {
@@ -501,14 +518,16 @@ function tryGetRoute() {
 }
 
 function setStartFromMap(e) {
-    document.getElementById('inputFrom').value = e.latlng.lat + "," + e.latlng.lng;
-    addMarker(e.latlng, 0, 'start', false, updateInputFields);
+    addMarker(e.latlng, 0, 'start', false, function(){});
+    document.getElementById(getViaFieldId(0)).value = e.latlng.lat + "," + e.latlng.lng;
     tryGetRoute();
 }
 
 function setEndFromMap(e) {
-    document.getElementById('inputTo').value = e.latlng.lat + "," + e.latlng.lng;
-    addMarker(e.latlng, markers.length - 1, 'end', false, updateInputFields);
+    // check if end is set so far
+    var inputFields = document.querySelectorAll('input.pointInputField');
+    addMarker(e.latlng, markers.length - 1, 'end', false, function(){});
+    document.getElementById(getViaFieldId(markers.length - 1)).value = e.latlng.lat + "," + e.latlng.lng;
     tryGetRoute();
 }
 
@@ -668,15 +687,15 @@ document.getElementById('mapid').addEventListener('drop',
 );
 
 function registerDragDropEventsForAll() {
-    Array.from(document.getElementsByClassName('viaBlock')).forEach(function(elem) {
+    Array.from(document.getElementsByClassName('pointBlock')).forEach(function(elem) {
         registerDragAndDropEvents(elem);
     });
 }
 
 
 document.getElementById('submit').addEventListener('click', function(event){getAndDisplayRoute();});
-document.getElementById('inputFrom').addEventListener('keypress', function(event){formEnterKeyPressed(event, getAndDisplayRoute);});
-document.getElementById('inputTo').addEventListener('keypress', function(event){formEnterKeyPressed(event, getAndDisplayRoute);});
+document.getElementById(getViaFieldId(0)).addEventListener('keypress', function(event){formEnterKeyPressed(event, getAndDisplayRoute);});
+document.getElementById(getViaFieldId(1)).addEventListener('keypress', function(event){formEnterKeyPressed(event, getAndDisplayRoute);});
 document.getElementById('vehicle').addEventListener('change', tryGetRoute);
 document.getElementById('vehicle').addEventListener('keypress', function(event){formEnterKeyPressed(event, getAndDisplayRoute);});
 registerDragDropEventsForAll();

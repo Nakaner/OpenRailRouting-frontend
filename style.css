@@ -144,6 +144,10 @@ form#routing > label {
     margin-top: 10px;
 }
 
+form#routing ul li label {
+    display: block;
+}
+
 img.formIcon,
 form#routing > input[type='text']{
     height: 32px;
@@ -204,7 +208,7 @@ div#routingErrorMessage {
     display: block;
 }
 
-ul li.viaBlock {
+ul li.pointBlock {
     list-style-type: none;
 }
 

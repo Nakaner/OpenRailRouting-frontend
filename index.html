@@ -36,23 +36,18 @@
         <form id="routing">
             <label>vehicle</label>
             <select name="vehicle" id="vehicle" size="4"></select>
-            <label>from <span class="inputDescription">(lat, lon)</span></label>
-            <div class="fieldWithIcon">
-                <img src="images/marker-green.svg" class="formIcon" draggable="false">
-                <input type="text" id="inputFrom" autocomplete="off">
-            </div>
-            <label>via <span class="inputDescription">(lat, lon)</span></label>
             <ul id="vias">
-                <li class="fieldWithIcon viaBlock" id="viaBlock1" draggable="true">
-                    <img src="images/marker-blue.svg" class="formIcon draggableVia" draggable="false">
-                    <input type="text" id="via_1" class="viaInputField" data-point-index="1" autocomplete="off">
+                <li class="fieldWithIcon pointBlock" id="pointBlock0" draggable="true">
+                    <label>from <span class="inputDescription">(lat, lon)</span></label>
+                    <img src="images/marker-green.svg" class="formIcon draggableVia" draggable="false">
+                    <input type="text" id="point_0" class="pointInputField" data-point-index="1" autocomplete="off">
+                </li>
+                <li class="fieldWithIcon pointBlock" id="pointBlock1" draggable="true">
+                    <label>to <span class="inputDescription">(lat, lon)</span></label>
+                    <img src="images/marker-red.svg" class="formIcon draggableVia" draggable="false">
+                    <input type="text" id="point_1" class="pointInputField" data-point-index="1" autocomplete="off">
                 </li>
             </ul>
-            <label>to <span class="inputDescription">(lat, lon)</span></label>
-            <div>
-                <img src="images/marker-red.svg" class="formIcon" draggable="false">
-                <input type="text" id="inputTo" autocomplete="off">
-            </div>
             <input type="button" id="submit" value="Get route">
         </form>
 	<div class="errorMessage" id="routingErrorMessage"></div>
