@@ -150,6 +150,7 @@ function updateInputFields() {
     for (k = 1; k < markers.length - 1; k++) {
         var newBlock = pointBlock1.cloneNode(true);
         newBlock.id = 'pointBlock' + k;
+        newBlock.querySelector('label').innerHTML = 'via <span class="inputDescription">(lat, lon)</span>';
         newBlock.querySelector('input').id = getViaFieldId(k);
         newBlock.querySelector('input').value = '';
         newBlock.querySelector('input').setAttribute('point-index', k);
