@@ -1,5 +1,6 @@
 "use strict";
 
+var nominatimUrl = 'https://nominatim.openstreetmap.org/search?';
 var startLatitude = 50.9; // initial latitude of the center of the map
 var startLongitude = 10.7; // initial longitude of the center of the map
 var startZoom = 7; // initial zoom level
@@ -57,6 +58,18 @@ var markers = [null, null];
 // drag and drop global vars
 var dragSrc = null;
 
+
+
+function escapeHtml(unsafe) {
+    return unsafe
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+
 function getLayerNameByID(layerID) {
     var name = '';
     Object.keys(overlaysMeta).forEach(function(key){
@@ -67,7 +80,20 @@ function getLayerNameByID(layerID) {
     return name;
 }
 
-function parseUrl(url) {
+function closeSearchResults() {
+    document.getElementById('searchResultsBox').classList.add('search-results-box-invisible');
+    document.getElementById('searchResultsBox').classList.remove('search-results-box-visible');
+}
+
+function latLngFromString(str) {
+    var parts = str.split(',');
+    if (parts.length === 2) {
+        return L.latLng(parts);
+    }
+    return null;
+}
+
+function setupMapAndMarkers(url) {
     var keyValues = location.hash.substr(1).split("&");
     var queryParams = {};
     keyValues.forEach(function(item) {
@@ -104,6 +130,56 @@ function parseUrl(url) {
         startLatitude = queryParams['lat'];
         startLongitude = queryParams['lon'];
     }
+
+    mymap = L.map('mapid', {
+        center: [startLatitude, startLongitude],
+        zoom: startZoom,
+        layers: initialLayers,
+        attributionControl: false,
+        contextmenu: true,
+        contextmenuWidth: 140,
+        contextmenuItems: [{
+            text: "set as start",
+            callback: setStartFromMap
+        }, {
+            text: "set as via",
+            callback: setViaFromMap
+        }, {
+            text: "set as destination",
+            callback: setEndFromMap
+        }]
+    });
+    layerControl = L.control.layers(baseLayers, overlays);
+    attributionControl = L.control.attribution();
+    attributionControl.addTo(mymap);
+    layerControl.addTo(mymap);
+    updateAttribution();
+
+    if (queryParams.hasOwnProperty('points')) {
+        var pointList = queryParams['points'].split(';');
+        pointList = pointList.map(p => latLngFromString(p));
+        for (var i = 0; i < pointList.length; ++i) {
+            if (!pointList[i]) {
+                console.error('entry ' + i + ' is null');
+                return;
+            }
+        }
+        if (pointList.length < 2) {
+            console.error('pointList is too short');
+            return;
+        }
+        addMarker(pointList[0], 0, 'start', false, function(){});
+        for (var i = 1; i < pointList.length - 1; ++i) {
+            addVia(pointList[i], i, function(){});
+        }
+        addMarker(pointList[pointList.length - 1], pointList.length - 1, 'end', false, function(){});
+
+        updateInputFields();
+        if (queryParams.hasOwnProperty('vehicle')) {
+            document.getElementById('vehicle').value = decodeURIComponent(queryParams['vehicle']);
+            tryGetRoute(decodeURIComponent(queryParams['vehicle']));
+        }
+    }
 }
 
 
@@ -125,6 +201,10 @@ function updateUrl(newBaseLayerName, overlayIDs) {
     var origin = location.origin;
     var pathname = location.pathname;
     var newurl = origin + pathname + '#overlays=' + overlayIDs + '&zoom=' + mymap.getZoom() + '&lat=' + mymap.getCenter().lat.toFixed(6) + '&lon=' + mymap.getCenter().lng.toFixed(6);
+    if (markers.length >= 2 && markers[0] && markers[1]) {
+        newurl += '&points=' + markers.map(m => String(m.getLatLng().lat) + ',' + String(m.getLatLng().lng)).join(';');
+    }
+    newurl += '&vehicle=' + encodeURIComponent(document.getElementById('vehicle').value);
     history.replaceState('', document.title, newurl);
 }
 
@@ -187,7 +267,9 @@ function updateMarkersList() {
     // Vias is sorted by the order of the input fields in the DOM.
     // remove old markers from map
     markers.forEach(function(m) {
-        m.removeFrom(mymap);
+        if (m) {
+            m.removeFrom(mymap);
+        }
     });
     markers = [];
     // add start marker
@@ -203,7 +285,6 @@ function updateMarkersList() {
             markerType = 'end';
         }
         points[i].parentNode.getElementsByTagName('img')[0].src = markerIconsPaths[markerType];
-        console.log('going to addMarker with index ' + (i) + ' and markers: ' + markers);
         addMarker(latlng, i + 1, markerType, true, function(){});
         //var marker = L.marker(latlng, {draggable: true}).bindPopup(getMarkerPopupContent(i));
         //markers[i] = marker;
@@ -493,6 +574,61 @@ function parseCoordsFromStr(str) {
     return null;
 }
 
+function setField(index, lon, lat) {
+    var inputField = document.getElementById(getViaFieldId(index));
+    inputField.value = Number(lat).toFixed(6) + ',' + Number(lon).toFixed(6);
+}
+
+function geocode(index) {
+    var q = encodeURIComponent(document.getElementById(getViaFieldId(index)).value);
+    var viewbox = mymap.getBounds();
+    var url = nominatimUrl + 'q=' + q + '&format=json&viewbox=' + viewbox.toBBoxString();
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.responseType = 'json';
+    xhr.onreadystatechange = function() {
+        if(xhr.readyState == XMLHttpRequest.DONE && xhr.status == 200) {
+            console.log(xhr.response);
+            if (xhr.response.length === 0) {
+                displayError('No places found for your search term. Please change your search term or right-click on the map.');
+                return;
+            }
+            var searchResults = document.getElementById('searchResults_' + index);
+            for (var i = 0; i < xhr.response.length; ++i) {
+                var lon = parseFloat(xhr.response[i].lon);
+                var lat = parseFloat(xhr.response[i].lat);
+                if (!Number.isFinite(lon) || !Number.isFinite(lat)) {
+                    displayError('The result list cannot be parsed');
+                    return;
+                }
+                var aElem = document.createElement('a');
+                aElem.href = '#';
+                aElem.addEventListener('click', function(index, lon, lat, parentUl, e) {
+                    setField(index, lon, lat);
+                    while (parentUl.firstChild) {
+                        parentUl.removeChild(parentUl.firstChild);
+                    }
+                    var markerType = 'via';
+                    if (index === 0) {
+                        markerType = 'start';
+                    } else if (index === markers.length - 1) {
+                        markerType = 'end';
+                    }
+                    addMarker(L.latLng(lat, lon), index, markerType, false, getAndDisplayRoute);
+                }.bind(aElem, index, xhr.response[i].lon, xhr.response[i].lat, searchResults));
+                aElem.appendChild(document.createTextNode(xhr.response[i].display_name));
+                var liElem = document.createElement('li');
+                liElem.appendChild(aElem);
+                searchResults.appendChild(liElem);
+            }
+        }
+    }
+    xhr.onerror = function() {
+        displayError('Failed to contact Nominatim geocoder.');
+    };
+    xhr.send();
+}
+
 function getAndDisplayRoute(e) {
     var points = getStartAndEnd();
     if (!requestPointsValid(points)) {
@@ -504,6 +640,13 @@ function getAndDisplayRoute(e) {
     }
     if (points[0] != null && points[points.length - 1] != null) {
         getGHRoute(points, document.getElementById('vehicle').value);
+    } else if (start === null) {
+        // use geocoder to get coordinates
+        console.log('geocode start');
+        geocode(0);
+    } else if (end === null) {
+        // use geocoder to get coordinates
+        geocode(points.length - 1);
     }
 }
 
@@ -511,10 +654,12 @@ function getAndDisplayRoute(e) {
  * Try to send a route request.
  * If the start or the end point has not been set yet, this function does nothing.
  */
-function tryGetRoute() {
+function tryGetRoute(vehicleDefaultValue) {
     var points = getStartAndEnd();
+    var vehicle = vehicleDefaultValue || document.getElementById('vehicle').value;
+    console.log('call for vehicle ' + vehicle);
     if (requestPointsValid(points)) {
-        getGHRoute(points, document.getElementById('vehicle').value);
+        getGHRoute(points, vehicle);
     }
 }
 
@@ -532,9 +677,9 @@ function setEndFromMap(e) {
     tryGetRoute();
 }
 
-function addVia(coords, index) {
+function addVia(coords, index, callback) {
     addMarker(coords, index, 'via', true, updateInputFields);
-    tryGetRoute();
+    callback();
 }
 
 function setViaFromMap(e) {
@@ -542,10 +687,10 @@ function setViaFromMap(e) {
     var currentVias = markers.length - 2;
     if (currentVias == 0) {
         // set first via
-        addVia(e.latlng, 1);
+        addVia(e.latlng, 1, tryGetRoute);
     } else {
         var index = getNextPoints(e.latlng);
-        addVia(e.latlng, index);
+        addVia(e.latlng, index, tryGetRoute);
     }
 }
 
@@ -564,32 +709,8 @@ function getCurrentOverlays() {
 }
 
 
-parseUrl();
-mymap = L.map('mapid', {
-    center: [startLatitude, startLongitude],
-    zoom: startZoom,
-    layers: initialLayers,
-    attributionControl: false,
-    contextmenu: true,
-    contextmenuWidth: 140,
-    contextmenuItems: [{
-        text: "set as start",
-        callback: setStartFromMap
-    }, {
-        text: "set as via",
-        callback: setViaFromMap 
-    }, {
-        text: "set as destination",
-        callback: setEndFromMap
-    }]
-});
-layerControl = L.control.layers(baseLayers, overlays);
-attributionControl = L.control.attribution();
-attributionControl.addTo(mymap);
-layerControl.addTo(mymap);
-
-updateAttribution();
 loadInfos();
+setupMapAndMarkers();
 
 // change URL in address bar an overlay is removed
 mymap.on('overlayremove', function(e) {
@@ -605,6 +726,11 @@ mymap.on('overlayadd', function(e) {
     activeLayers.push(e.name);
     updateUrl('', getCurrentOverlays());
     updateAttribution();
+});
+
+// change URL in address bar if the map is moved
+mymap.on('moveend', function(e) {
+    updateUrl('', getCurrentOverlays());
 });
 
 function registerDragAndDropEvents(elem) {
@@ -676,10 +802,10 @@ document.getElementById('mapid').addEventListener('drop',
             dropCoords = [dropCoords[0] - routeMarkerOptions.iconSize[0], dropCoords[1] + routeMarkerOptions.iconSize[1] / 2];
             var coords = mymap.containerPointToLatLng(L.point(dropCoords));
             if (markers.length - 2 === 0) {
-                addVia(coords, 1);
+                addVia(coords, 1, tryGetRoute);
             } else {
                 var index = getNextPoints(coords);
-                addVia(coords, index);
+                addVia(coords, index, tryGetRoute);
             }
             dragSrc = null;
         }
@@ -697,6 +823,12 @@ function registerDragDropEventsForAll() {
 document.getElementById('submit').addEventListener('click', function(event){getAndDisplayRoute();});
 document.getElementById(getViaFieldId(0)).addEventListener('keypress', function(event){formEnterKeyPressed(event, getAndDisplayRoute);});
 document.getElementById(getViaFieldId(1)).addEventListener('keypress', function(event){formEnterKeyPressed(event, getAndDisplayRoute);});
-document.getElementById('vehicle').addEventListener('change', tryGetRoute);
+document.getElementById('vehicle').addEventListener(
+    'change',
+    function(event) {
+        tryGetRoute();
+    }
+);
 document.getElementById('vehicle').addEventListener('keypress', function(event){formEnterKeyPressed(event, getAndDisplayRoute);});
+document.getElementById('close_icon').addEventListener('click', closeSearchResults);
 registerDragDropEventsForAll();

@@ -133,6 +133,7 @@ img#loading {
     background: #ccc;
     float: left;
     padding: 15px 15px 15px 15px;
+    overflow-y: scroll;
 }
 
 form#routing > input{
@@ -195,6 +196,48 @@ div.errorMessage {
 
 div#routingErrorMessage {
     display: none;
+}
+
+/* search results */
+div#searchResultsBox {
+    z-index: 1001;
+    position: relative;
+    background-color: white;
+    padding: 10px 10px 10px 10px;
+    border-color: #bbbbbb;
+    border-width: 2px;
+    border-radius: 10px;
+    margin-left: 60px;
+    margin-top: 40px;
+    max-width: 390px;
+    max-height: calc(100% - 70px);
+}
+
+div.search-results-box-invisible {
+    display: none;
+}
+
+div.search-results-box-visible {
+    display: inline-block;
+}
+
+ul.search-results {
+    padding-left: 0px;
+    list-style: none;
+    padding-top: 8px;
+/*    max-height: calc(100% - 70px);
+    overflow-y: scroll;
+    padding-right: 20px;*/
+}
+
+ul.search-results li {
+    font-size: 12px;
+    margin-bottom: 6px;
+}
+
+.float_right {
+    margin-bottom: 10px;
+    float: right;
 }
 
 /* context menu */
