@@ -81,8 +81,10 @@ function getLayerNameByID(layerID) {
 }
 
 function closeSearchResults() {
-    document.getElementById('searchResultsBox').classList.add('search-results-box-invisible');
-    document.getElementById('searchResultsBox').classList.remove('search-results-box-visible');
+    var searchResultsLists = document.getElementsByClassName('search-results');
+    Array.prototype.forEach.call(searchResultsLists, function(e) {
+        e.classList.add('search-results-box-invisible');
+    });
 }
 
 function latLngFromString(str) {
@@ -160,12 +162,10 @@ function setupMapAndMarkers(url) {
         pointList = pointList.map(p => latLngFromString(p));
         for (var i = 0; i < pointList.length; ++i) {
             if (!pointList[i]) {
-                console.error('entry ' + i + ' is null');
                 return;
             }
         }
         if (pointList.length < 2) {
-            console.error('pointList is too short');
             return;
         }
         addMarker(pointList[0], 0, 'start', false, function(){});
@@ -177,7 +177,7 @@ function setupMapAndMarkers(url) {
         updateInputFields();
         if (queryParams.hasOwnProperty('vehicle')) {
             document.getElementById('vehicle').value = decodeURIComponent(queryParams['vehicle']);
-            tryGetRoute(decodeURIComponent(queryParams['vehicle']));
+            tryGetRoute(decodeURIComponent(queryParams['vehicle'], 'markers'));
         }
     }
 }
@@ -212,6 +212,10 @@ function getViaFieldId(index) {
     return "point_" + index;
 }
 
+function getSearchResultsListId(index) {
+    return "searchResults_" + index;
+}
+
 function updateInputFields() {
     var viaUl = document.getElementById('vias');
     var viaBlocks = viaUl.querySelectorAll('.pointBlock');
@@ -232,13 +236,17 @@ function updateInputFields() {
         newBlock.id = 'pointBlock' + k;
         newBlock.querySelector('label').innerHTML = 'via <span class="inputDescription">(lat, lon)</span>';
         newBlock.querySelector('input').id = getViaFieldId(k);
+        newBlock.querySelector('ul.search-results').id = getSearchResultsListId(k);
         newBlock.querySelector('input').value = '';
-        newBlock.querySelector('input').setAttribute('point-index', k);
+        newBlock.setAttribute('data-point-index', k);
         if (k > 0) {
             newBlock.querySelector('img').src = markerIconsPaths.via;
         }
         pointBlock1.parentNode.insertBefore(newBlock, viaBlocks[viaBlocks.length - 1]); // insert before last point
     }
+    // update index of last viaBlock
+    var pointBlockLast = viaUl.querySelectorAll('li.pointBlock')[markers.length - 1];
+    pointBlockLast.setAttribute('data-point-index', markers.length - 1);
     // add/update fields
     var i;
     for (i = 0; i < markers.length; i++) {
@@ -258,7 +266,7 @@ function updateInputFields() {
 function updateViaIndexes() {
     var vias = Array.prototype.slice.call(document.getElementsByClassName('pointInputField'));
     for (var i = 0; i < vias.length; ++i) {
-        vias[i].setAttribute('point-index', i + 1);
+        vias[i].parentNode.setAttribute('data-point-index', i + 1);
     }
 }
 
@@ -275,7 +283,7 @@ function updateMarkersList() {
     // add start marker
     // update point indexes and add new markers
     for (var i = 0; i < points.length; ++i) {
-        points[i].setAttribute('point-index', i);
+        points[i].parentNode.setAttribute('data-point-index', i);
         points[i].id = getViaFieldId(i);
         var latlng = parseCoordsFromStr(points[i].value);
         var markerType = 'via';
@@ -286,9 +294,6 @@ function updateMarkersList() {
         }
         points[i].parentNode.getElementsByTagName('img')[0].src = markerIconsPaths[markerType];
         addMarker(latlng, i + 1, markerType, true, function(){});
-        //var marker = L.marker(latlng, {draggable: true}).bindPopup(getMarkerPopupContent(i));
-        //markers[i] = marker;
-        //marker.addTo(mymap);
     }
 }
 
@@ -303,7 +308,7 @@ function getMarkerPopupContent(index, message) {
     if (message === 'end') {
         return '<b>end</b>';
     }
-    return '<b>via ' + index + '</b><br><button type="button" onclick="removeMarker(' + index + ')">Remove</button>';
+    return '<b>via ' + index + '</b><br><button type="button" onclick="removeMarker(' + index + ', 1)">Remove</button>';
 }
 
 function addMarker(latlng, index, message, insert /*= false*/, callbackAfter) {
@@ -341,15 +346,14 @@ function addMarker(latlng, index, message, insert /*= false*/, callbackAfter) {
     }
     // update text input field entries in the form
     callbackAfter();
-    // updateInputFields();
     marker.on('dragend', function(e){
         updateInputFields();
-        tryGetRoute();
+        tryGetRoute('', 'markers');
     });
     marker.addTo(mymap);
 }
 
-function removeMarker(index) {
+function removeMarker(index, touchInputFields) {
     var thisMarker = markers[index];
     thisMarker.removeFrom(mymap);
     // remove marker from array
@@ -358,8 +362,10 @@ function removeMarker(index) {
     for (var i = 1; i < markers.length - 1; i++) {
         markers[i].setPopupContent(getMarkerPopupContent(i, null));
     }
-    updateInputFields();
-    tryGetRoute();
+    if (touchInputFields === 1) {
+        updateInputFields();
+    }
+    tryGetRoute('', 'markers');
 }
 
 /**
@@ -454,6 +460,7 @@ function displayRouteGH(response) {
     route.clearLayers();
     var errorDiv = document.getElementById('routingErrorMessage');
     errorDiv.style.display = 'none';
+    //TODO catch: response == null
     if (!response.hasOwnProperty('paths')) {
         if (response.hasOwnProperty('message')) {
             displayError(response.message)
@@ -547,13 +554,34 @@ function getGHRoute(points, vehicle) {
     xhr.send();
 }
 
-function getStartAndEnd() {
-    var pointList = markers.map(x => {
-        if (x != null) {
-            return x.getLatLng();
+function getStartAndEnd(coordsFrom/*='markers'*/) {
+    coordsFrom = coordsFrom || 'markers';
+    if (coordsFrom === 'input_fields') {
+        return markers.map(x => {
+            return null;
+        });
+    }
+    if (coordsFrom === 'markers') {
+        var pointList = markers.map(x => {
+            if (x != null) {
+                return x.getLatLng();
+            }
+            return null;
+        });
+        return pointList;
+    }
+    var inputFields = document.querySelectorAll('input.pointInputField');
+    if (inputFields.length < pointList.length) {
+        // remove tail
+        pointList.splice(-1);
+    } else if (inputFields.length > pointList.length) {
+        for (var i = pointList.length; i < inputFields.length; ++i) {
+            pointList.splice(-1, 0, null);
         }
-        return null;
-    });
+    }
+    for (var i = 0; i < inputFields.length; ++i) {
+        pointList[i] = parseCoordsFromStr(inputFields[i].value);
+    }
     return pointList;
 }
 
@@ -579,8 +607,11 @@ function setField(index, lon, lat) {
     inputField.value = Number(lat).toFixed(6) + ',' + Number(lon).toFixed(6);
 }
 
-function geocode(index) {
+function geocode(index, markerType) {
     var q = encodeURIComponent(document.getElementById(getViaFieldId(index)).value);
+    if (markerType === 'via') {
+        removeMarker(index, 0);
+    }
     var viewbox = mymap.getBounds();
     var url = nominatimUrl + 'q=' + q + '&format=json&viewbox=' + viewbox.toBBoxString();
     var xhr = new XMLHttpRequest();
@@ -588,12 +619,12 @@ function geocode(index) {
     xhr.responseType = 'json';
     xhr.onreadystatechange = function() {
         if(xhr.readyState == XMLHttpRequest.DONE && xhr.status == 200) {
-            console.log(xhr.response);
             if (xhr.response.length === 0) {
                 displayError('No places found for your search term. Please change your search term or right-click on the map.');
                 return;
             }
             var searchResults = document.getElementById('searchResults_' + index);
+            searchResults.classList.remove('search-results-box-invisible');
             for (var i = 0; i < xhr.response.length; ++i) {
                 var lon = parseFloat(xhr.response[i].lon);
                 var lat = parseFloat(xhr.response[i].lat);
@@ -608,13 +639,7 @@ function geocode(index) {
                     while (parentUl.firstChild) {
                         parentUl.removeChild(parentUl.firstChild);
                     }
-                    var markerType = 'via';
-                    if (index === 0) {
-                        markerType = 'start';
-                    } else if (index === markers.length - 1) {
-                        markerType = 'end';
-                    }
-                    addMarker(L.latLng(lat, lon), index, markerType, false, getAndDisplayRoute);
+                    addMarker(L.latLng(lat, lon), index, markerType, true, getAndDisplayRoute);
                 }.bind(aElem, index, xhr.response[i].lon, xhr.response[i].lat, searchResults));
                 aElem.appendChild(document.createTextNode(xhr.response[i].display_name));
                 var liElem = document.createElement('li');
@@ -629,24 +654,37 @@ function geocode(index) {
     xhr.send();
 }
 
-function getAndDisplayRoute(e) {
-    var points = getStartAndEnd();
+function getAndDisplayRoute(coordSource) {
+    coordSource = coordSource || 'markers';
+    var points = getStartAndEnd(coordSource);
     if (!requestPointsValid(points)) {
         //TODO Is this still necessary?
         // fill with coordinates from text input fields
-        var start = parseCoordsFromStr(document.getElementById(getViaFieldId(0)).value);
-        var end = parseCoordsFromStr(document.getElementById(getViaFieldId(markers.length - 1)).value);
-        points = [start, end];
+        var inputFields = Array.prototype.slice.call(document.querySelectorAll('input.pointInputField'));
+        // create capacity if not available
+        if (points.length != inputFields.length) {
+            points = new Array(5).fill(null);
+        };
+        for (var i = 0; i < inputFields.length; ++i) {
+            points[i] = parseCoordsFromStr(document.getElementById(getViaFieldId(i)).value);
+        }
     }
-    if (points[0] != null && points[points.length - 1] != null) {
+    var fieldIndexToGeocode = -1;
+    for (var i = 0; i < points.length; ++i) {
+        if (points[i] == null) {
+            fieldIndexToGeocode = i;
+            break;
+        }
+    };
+    if (fieldIndexToGeocode === -1) { //!noFieldpoints[0] != null && points[points.length - 1] != null) {
         getGHRoute(points, document.getElementById('vehicle').value);
-    } else if (start === null) {
+    } else if (points[0] === null) {
         // use geocoder to get coordinates
-        console.log('geocode start');
-        geocode(0);
-    } else if (end === null) {
-        // use geocoder to get coordinates
-        geocode(points.length - 1);
+        geocode(0, 'start');
+    } else if (points[points.length - 1] === null) {
+        geocode(points.length - 1, 'end');
+    } else {
+        geocode(fieldIndexToGeocode, 'via');
     }
 }
 
@@ -654,27 +692,31 @@ function getAndDisplayRoute(e) {
  * Try to send a route request.
  * If the start or the end point has not been set yet, this function does nothing.
  */
-function tryGetRoute(vehicleDefaultValue) {
-    var points = getStartAndEnd();
-    var vehicle = vehicleDefaultValue || document.getElementById('vehicle').value;
-    console.log('call for vehicle ' + vehicle);
+function tryGetRoute(vehicleDefaultValue, coordsSource) {
+    var points = getStartAndEnd(coordsSource);
+    var vehicle = vehicleDefaultValue || '';
+    if (vehicle === '') {
+        vehicle = document.getElementById('vehicle').value;
+    }
     if (requestPointsValid(points)) {
         getGHRoute(points, vehicle);
     }
 }
 
 function setStartFromMap(e) {
+    closeSearchResults();
     addMarker(e.latlng, 0, 'start', false, function(){});
     document.getElementById(getViaFieldId(0)).value = e.latlng.lat + "," + e.latlng.lng;
-    tryGetRoute();
+    tryGetRoute('', 'markers');
 }
 
 function setEndFromMap(e) {
+    closeSearchResults();
     // check if end is set so far
     var inputFields = document.querySelectorAll('input.pointInputField');
     addMarker(e.latlng, markers.length - 1, 'end', false, function(){});
     document.getElementById(getViaFieldId(markers.length - 1)).value = e.latlng.lat + "," + e.latlng.lng;
-    tryGetRoute();
+    tryGetRoute('', 'markers');
 }
 
 function addVia(coords, index, callback) {
@@ -683,14 +725,15 @@ function addVia(coords, index, callback) {
 }
 
 function setViaFromMap(e) {
+    closeSearchResults();
     // existing number of vias
     var currentVias = markers.length - 2;
     if (currentVias == 0) {
         // set first via
-        addVia(e.latlng, 1, tryGetRoute);
+        addVia(e.latlng, 1, function(){tryGetRoute('', 'markers');});
     } else {
         var index = getNextPoints(e.latlng);
-        addVia(e.latlng, index, tryGetRoute);
+        addVia(e.latlng, index, function(){tryGetRoute('', 'markers');});
     }
 }
 
@@ -775,7 +818,7 @@ function registerDragAndDropEvents(elem) {
                 dragSrc = null;
                 updateViaIndexes();
                 updateMarkersList();
-                getAndDisplayRoute();
+                getAndDisplayRoute('input_fields');
             }
             this.classList.remove('draggedOver');
         },
@@ -792,23 +835,40 @@ document.getElementById('mapid').addEventListener('dragover',
     false
 );
 
+function getElementStyle(el) {
+    if (window.getComputedStyle) {
+        return getComputedStyle(el, null);
+    }
+    return el.currentStyle;
+}
+
 document.getElementById('mapid').addEventListener('drop',
     function(ev) {
-        console.log('drop mymap');
         ev.preventDefault;
         // if dragSrc != null, we are in dragging mode
-        if (dragSrc != null) {
-            var dropCoords = [ev.clientX - dragSrc.offsetWidth, ev.clientY - dragSrc.offsetHeight];
-            dropCoords = [dropCoords[0] - routeMarkerOptions.iconSize[0], dropCoords[1] + routeMarkerOptions.iconSize[1] / 2];
-            var coords = mymap.containerPointToLatLng(L.point(dropCoords));
-            if (markers.length - 2 === 0) {
-                addVia(coords, 1, tryGetRoute);
-            } else {
-                var index = getNextPoints(coords);
-                addVia(coords, index, tryGetRoute);
-            }
-            dragSrc = null;
+        if (dragSrc == null) {
+            return;
         }
+        var routingControlsElem = document.getElementById('routingcontrols');
+        var offsetLeft = routingControlsElem.offsetWidth;
+        var routingControlsElemStyle = getElementStyle(routingControlsElem);
+        offsetLeft += parseInt(routingControlsElemStyle.marginLeft);
+        var headerElem = document.getElementsByTagName('header')[0];
+        var offsetTop = headerElem.offsetHeight;
+        var headerElemStyle = getElementStyle(headerElem);
+        offsetTop += parseInt(headerElemStyle.marginTop);
+        var dropCoords = [ev.clientX - offsetLeft, ev.clientY - offsetTop];
+        var coords = mymap.containerPointToLatLng(L.point(dropCoords));
+        var pointIndex = parseInt(dragSrc.getAttribute('data-point-index'), 10);
+        if (pointIndex == 0) {
+            setStartFromMap({'latlng': coords});
+        } else if (pointIndex == markers.length - 1) {
+            setEndFromMap({'latlng': coords});
+        } else {
+            var index = getNextPoints(coords);
+            addVia(coords, index, function(){tryGetRoute('', 'markers');});
+        }
+        dragSrc = null;
     },
     false
 );
@@ -820,15 +880,33 @@ function registerDragDropEventsForAll() {
 }
 
 
-document.getElementById('submit').addEventListener('click', function(event){getAndDisplayRoute();});
-document.getElementById(getViaFieldId(0)).addEventListener('keypress', function(event){formEnterKeyPressed(event, getAndDisplayRoute);});
-document.getElementById(getViaFieldId(1)).addEventListener('keypress', function(event){formEnterKeyPressed(event, getAndDisplayRoute);});
+document.getElementById('submit').addEventListener('click', function(event){getAndDisplayRoute('input_fields');});
+for (var i = 0; i < 2; ++i) {
+    document.getElementById(getViaFieldId(i)).addEventListener(
+        'keypress',
+        function(event) {
+            formEnterKeyPressed(event,
+                function(){
+                    getAndDisplayRoute('input_fields')
+                }
+            );
+        }
+    );
+}
+document.getElementById('vehicle').addEventListener(
+    'keypress',
+    function(event) {
+        formEnterKeyPressed(event,
+            function(){
+                getAndDisplayRoute('input_fields')
+            }
+        );
+    }
+);
 document.getElementById('vehicle').addEventListener(
     'change',
     function(event) {
-        tryGetRoute();
+        tryGetRoute('', 'markers');
     }
 );
-document.getElementById('vehicle').addEventListener('keypress', function(event){formEnterKeyPressed(event, getAndDisplayRoute);});
-document.getElementById('close_icon').addEventListener('click', closeSearchResults);
 registerDragDropEventsForAll();

@@ -213,13 +213,13 @@ div#searchResultsBox {
     max-height: calc(100% - 70px);
 }
 
-div.search-results-box-invisible {
+ul.search-results-box-invisible {
     display: none;
 }
 
-div.search-results-box-visible {
+/*ul.search-results-box-visible {
     display: inline-block;
-}
+}*/
 
 ul.search-results {
     padding-left: 0px;
