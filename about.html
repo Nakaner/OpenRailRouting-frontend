@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>About OpenRailRouting</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <header>
+        <img src="images/hamburger.svg" id="open-menu-icon" />
+        <div id="title">
+            <a href="index.html">About OpenRailRouting</a>
+        </div>
+        <nav id="menu">
+            <ul>
+                <li>
+                    <a href="#">About</a>
+                </li>
+                <li>
+                    <a href="imprint.html">Imprint</a>
+                </li>
+            </ul>
+        </nav>
+    </header>
+    <article>
+        <h1>About OpenRailRouting</h1>
+        <p>OpenRailRouting is a routing engine for railway vehicles on the railway network mapped in the OpenStreetMap database. The routing engine is based on GraphHopper, an OpenStreetMap routing engine in Java.</p>
+        <p>OpenRailRouting is free and open source software under the Apache License version 2. You can get the source code on <a href="https://github.com/geofabrik/OpenRailRouting">GitHub</a>. Build instructions for the backend written in Java can be found there.</p>
+        <p>The development of OpenRailRouting was sponsored by SNCF, the national railway company of France which heavily makes use of OpenStreetMap and its railway data.</p>
+        <h2>OpenRailRouting API</h2>
+        <p>OpenRailRouting (the backend) has an HTTP REST API which is almost identical to the API of GraphHopper. You can find the documentation currently on <a href="https://github.com/geofabrik/OpenRailRouting-doc">GitHub</a> only.</p>
+        <p><code>routing.openrailwaymap.org</code> is currently a demo not intended for production use. It runs on a small personal virtual machine. Its data does not get updated regularly. Please set up your own instance – you can do it.</p>
+        <h1>About OpenRailRouting Frontend</h1>
+        <p>This web frontend is free and open source software as well. You can find it on <a href="https://github.com/Nakaner/OpenRailRouting-frontend">GitHub</a> as well. It is licensed under the GNU General Public License version 2 or newer.</p>
+    </article>
+</body>
+<script type="text/javascript" src="hamburger.js"></script>
+</html>
