@@ -187,8 +187,8 @@ function updateAttribution() {
     attributionControl.remove();
     attributionControl = L.control.attribution();
     attributionControl.addAttribution('Map data © <a href="//www.openstreetmap.org/copyright">OpenStreetMap</a> contributors under <a href="https://opendatacommons.org/licenses/odbl/index.html">ODbL license</a>, map images <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>')
-    if (activeLayers.indexOf('OpenRailwayMap Infrastruktur')  != -1) {
-        attributionControl.addAttribution('Railway network overlay: CC-BY-SA <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> and <a href="https://www.openrailwaymap.org">OpenRailwayMap</a>');
+    if (activeLayers.indexOf('OpenRailwayMap Infrastructure')  != -1) {
+        attributionControl.addAttribution('Railway network overlay: <a href="https://www.openrailwaymap.org">OpenRailwayMap</a>');
     }
     attributionControl.addTo(mymap);
 }
