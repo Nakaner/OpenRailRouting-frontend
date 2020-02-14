@@ -547,7 +547,7 @@ function getGHRoute(points, vehicle) {
     xhr.open('GET', url, true);
     xhr.responseType = "json";
     xhr.onreadystatechange = function() {
-        if(xhr.readyState == XMLHttpRequest.DONE /*&& xhr.status == 200*/) {
+        if(xhr.readyState == XMLHttpRequest.DONE && xhr.status == 200) {
             displayRouteGH(xhr.response);
             showLoading(false);
         }
