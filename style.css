@@ -191,7 +191,7 @@ article {
 
 div.errorMessage {
     color: red;
-    font-weight: bold;
+    font-size: 80%;
 }
 
 div#routingErrorMessage {

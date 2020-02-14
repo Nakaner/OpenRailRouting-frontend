@@ -547,9 +547,19 @@ function getGHRoute(points, vehicle) {
     xhr.open('GET', url, true);
     xhr.responseType = "json";
     xhr.onreadystatechange = function() {
-        if(xhr.readyState == XMLHttpRequest.DONE && xhr.status == 200) {
+        if (xhr.readyState != XMLHttpRequest.DONE) {
+            return;
+        }
+        showLoading(false);
+        if (xhr.status == 200) {
             displayRouteGH(xhr.response);
-            showLoading(false);
+        } else if (xhr.status == 400) {
+            var hints = xhr.response.hints || [];
+            var msgs = hints.map(h => (h.message || ''));
+            var msg = msgs.join('<br>');
+            displayError('Route request failed.<br>' + msg);
+        } else {
+            displayError('Route request returned status code ' + xhr.status);
         }
     }
     xhr.send();
