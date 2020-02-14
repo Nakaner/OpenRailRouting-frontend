@@ -247,6 +247,7 @@ function updateInputFields() {
     // update index of last viaBlock
     var pointBlockLast = viaUl.querySelectorAll('li.pointBlock')[markers.length - 1];
     pointBlockLast.setAttribute('data-point-index', markers.length - 1);
+    pointBlockLast.querySelector('ul.search-results').id = getSearchResultsListId(k);
     // add/update fields
     var i;
     for (i = 0; i < markers.length; i++) {
@@ -607,6 +608,44 @@ function setField(index, lon, lat) {
     inputField.value = Number(lat).toFixed(6) + ',' + Number(lon).toFixed(6);
 }
 
+function getRailwayFeatureRank(value) {
+    var railwayFeatures = ['station', 'halt', 'yard', 'service_station', 'junction', 'crossover', 'site', 'spur_junction'];
+    // get index of railway value
+    for (var i = 0; i < railwayFeatures.length; ++i) {
+        if (railwayFeatures === value) {
+            return i;
+        }
+    }
+    return railwayFeatures.length;
+}
+
+/**
+ * Sort Nominatim result, prefer railway features but keep order of the others.
+ */
+function sortNominatimResult(input) {
+    var result = input.sort(function(a, b) {
+        if (a['class'] != 'railway' && b['class'] != 'railway') {
+            if (a['importance'] > b['importance']) {
+                return -1;
+            } else if (a['importance'] > b['importance']) {
+                return 1;
+            }
+            return 0;
+        }
+        if (a['class'] === 'railway' && b['class'] != 'railway') {
+            return -1;
+        } else if (a['class'] != 'railway' && b['class'] === 'railway') {
+            return 1;
+        }
+        var railwayFeatureRankDiff = getRailwayFeatureRank(a['class']) - getRailwayFeatureRank(b['class']);
+        if (railwayFeatureRankDiff != 0) {
+            return railwayFeatureRankDiff;
+        }
+        // importance: 1 is high, 0 is low
+        return b['importance'] - a['importance'];
+    });
+}
+
 function geocode(index, markerType) {
     var q = encodeURIComponent(document.getElementById(getViaFieldId(index)).value);
     if (markerType === 'via') {
@@ -618,13 +657,19 @@ function geocode(index, markerType) {
     xhr.open('GET', url, true);
     xhr.responseType = 'json';
     xhr.onreadystatechange = function() {
-        if(xhr.readyState == XMLHttpRequest.DONE && xhr.status == 200) {
+        if(xhr.readyState == XMLHttpRequest.DONE) {
+            if (xhr.status != 200) {
+                displayError(xhr.response);
+                return;
+            }
             if (xhr.response.length === 0) {
                 displayError('No places found for your search term. Please change your search term or right-click on the map.');
                 return;
             }
             var searchResults = document.getElementById('searchResults_' + index);
             searchResults.classList.remove('search-results-box-invisible');
+            // sort search results to prefer railway stations
+            //nominatimSorted = sortNominatimResult(xhr.response);
             for (var i = 0; i < xhr.response.length; ++i) {
                 var lon = parseFloat(xhr.response[i].lon);
                 var lat = parseFloat(xhr.response[i].lat);
