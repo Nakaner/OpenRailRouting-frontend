@@ -266,3 +266,8 @@ ul#vias {
 .draggedOver {
     border-top: 2px solid blue;
 }
+
+/* length and time of the returned route */
+.resultText {
+    display: none;
+}

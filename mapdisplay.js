@@ -455,6 +455,34 @@ function displayError(message) {
     errorDiv.innerHTML = 'Routing error: ';
     errorDiv.style.display = 'block';
     errorDiv.innerHTML += message;
+    document.getElementById('resultText').style.display = 'none';
+}
+
+function padMinSec(value) {
+    if (value < 10) {
+        return '0' + value;
+    }
+    return value.toString();
+}
+
+function setLengthAndTime(length, time) {
+    var lenElem = document.getElementById('distance');
+    var len = (length / 1000).toFixed(3);
+    lenElem.innerHTML = len + ' km';
+    var seconds = Math.floor(time / 1000);
+    var hours = Math.floor(seconds / 3600);
+    var minutes = Math.floor((seconds % 3600) / 60);
+    var seconds = Math.floor(seconds % 60);
+    var timeStr = '';
+    if (hours > 0) {
+        timeStr = hours + ':' + padMinSec(minutes) + ':' + padMinSec(seconds);
+    } else if (minutes > 0) {
+        timeStr = minutes + ':' + padMinSec(seconds);
+    } else {
+        timeStr = seconds + ' seconds';
+    }
+    document.getElementById('time').innerHTML = timeStr;
+    document.getElementById('resultText').style.display = 'block';
 }
 
 function displayRouteGH(response) {
@@ -469,7 +497,9 @@ function displayRouteGH(response) {
             displayError("Unknown error");
         }
     } else {
-        var raw_points = response['paths'][0]['points']['coordinates'];
+        var path = response['paths'][0];
+        setLengthAndTime(path['distance'], path['time']);
+        var raw_points = path['points']['coordinates'];
         raw_points.forEach(function(loc){
             // remove elevation
             loc = loc.slice(0, 2);
