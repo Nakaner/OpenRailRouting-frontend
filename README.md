@@ -1,3 +1,5 @@
+**ARCHIVED** This project was integrated into the [main OpenRailRouting repository](https://github.com/geofabrik/OpenRailRouting/tree/master/src/main/resources/de/geofabrik/openrailrouting/maps).
+
 Web Frontend (Demo) for OpenRailRouting
 =======================================
 
